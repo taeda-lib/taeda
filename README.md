@@ -1,3 +1,4 @@
+![logo](https://raw.githubusercontent.com/taeda-lib/resc/main/taeda_transparent.png)
 # Taeda
 
 **A lightweight Python library for GPU utilities and performance estimation.**
