@@ -33,15 +33,29 @@ pip install taeda
 ```python
 import taeda
 
+# Get theoretical GPU performance
 tflops = taeda.get_tflops(0)
 
 print(f"GPU Performance: {tflops:.3f} TFLOPS")
+
+# Get GPU information and statistics
+stats = taeda.get_gpu_stats(0)
+
+print(stats)
 ```
 
 Example output:
 
 ```text
 GPU Performance: 0.622 TFLOPS
+
+CUDA is available
+Device name: NVIDIA GeForce GTX 1070 Ti
+Device index: 0
+CUDA version: 12.1
+Total VRAM: 8.00 GB
+Used VRAM: 1.24 GB
+Free VRAM: 6.76 GB
 ```
 
 ## API
@@ -60,6 +74,26 @@ Estimates the theoretical FP32 performance of an NVIDIA GPU.
 
 The clock speed is retrieved dynamically through NVML.
 
+### `get_gpu_stats(device_num=0)`
+
+Retrieves GPU information and memory statistics using PyTorch CUDA.
+
+| Parameter | Description |
+|---|---|
+| `device_num` | CUDA GPU index (default: `0`) |
+
+**Returns:** A formatted string containing:
+
+- CUDA availability
+- GPU device name
+- GPU device index
+- CUDA version
+- Total VRAM
+- Used VRAM
+- Free VRAM
+
+**Raises:** Returns an error message if CUDA is unavailable or the GPU index is invalid.
+
 ## Limitations
 
 - TFLOPS values are theoretical estimates, not measured benchmark results.
@@ -67,6 +101,7 @@ The clock speed is retrieved dynamically through NVML.
 - CUDA core counts depend on GPU architecture.
 - Currently intended for supported NVIDIA CUDA GPUs.
 - Actual application performance depends on memory bandwidth, workload and other hardware limitations.
+- GPU memory statistics depend on PyTorch CUDA availability.
 
 ## License
 
