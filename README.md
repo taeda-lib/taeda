@@ -15,9 +15,12 @@ Taeda is a Python package that adds useful functions to PyTorch, including GPU m
 - Support multiple NVIDIA GPUs.
 - Retrieve GPU information and memory statistics.
 - **RAMVRAM:** Manage tensor storage between system RAM and GPU VRAM.
+- **RAMVRAMModel:** Experimental model wrapper for layer-by-layer CPU/GPU transfers.
 - Automatic VRAM usage monitoring.
 - CPU RAM offloading when GPU memory is limited.
 - Configurable VRAM usage limits.
+- Experimental autograd-compatible activation offloading.
+- Support for PyTorch backward passes and optimizer updates.
 - Simple Python API.
 
 ## Installation
@@ -37,6 +40,7 @@ pip install taeda
 ## Usage
 
 ```python
+import torch
 import taeda
 
 # Get theoretical GPU performance
@@ -46,7 +50,6 @@ print(f"GPU Performance: {tflops:.3f} TFLOPS")
 
 # Get GPU information and statistics
 stats = taeda.get_gpu_stats(0)
-
 print(stats)
 
 # Initialize RAMVRAM
@@ -61,6 +64,57 @@ tensor = memory.get(a)
 
 # Display memory information
 memory.report()
+```
+
+## RAMVRAMModel Usage
+
+`RAMVRAMModel` is an experimental PyTorch model wrapper designed to keep master model parameters in system RAM and transfer layers to GPU for computation.
+
+```python
+import torch
+import torch.nn as nn
+import taeda
+
+# Create a sequential model
+model = nn.Sequential(
+    nn.Linear(512, 1024),
+    nn.ReLU(),
+    nn.Linear(1024, 512),
+    nn.ReLU(),
+    nn.Linear(512, 10)
+)
+
+# Wrap the model
+model = taeda.RAMVRAMModel(
+    model,
+    max_vram_percent=80
+)
+
+# Optimizer operates on CPU master parameters
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=0.001
+)
+
+criterion = nn.CrossEntropyLoss()
+
+# Training loop
+for epoch in range(10):
+    x = torch.randn(32, 512)
+    y = torch.randint(0, 10, (32,))
+
+    optimizer.zero_grad(set_to_none=True)
+
+    output = model(x)
+    loss = criterion(output, y.to(output.device))
+
+    loss.backward()
+    optimizer.step()
+
+    print(f"Epoch {epoch + 1}: {loss.item():.5f}")
+
+# Display memory information
+model.report()
 ```
 
 ## API
@@ -124,6 +178,35 @@ Creates a tensor memory manager that manages storage between system RAM and GPU 
 | `remove(tensor_id)` | Removes a stored tensor |
 | `clear()` | Clears stored tensors |
 
+### `RAMVRAMModel(model, device="cuda", max_vram_percent=80, pin_memory=True)`
+
+Creates an experimental model wrapper for managing model weights and activations between system RAM and GPU VRAM.
+
+| Parameter | Description |
+|---|---|
+| `model` | PyTorch `nn.Sequential` model |
+| `device` | Target computation device (default: `"cuda"`) |
+| `max_vram_percent` | Configured VRAM budget percentage (default: `80`) |
+| `pin_memory` | Enable pinned CPU memory (default: `True`) |
+
+**Methods:**
+
+| Method | Description |
+|---|---|
+| `forward(x)` | Performs layer-by-layer model execution |
+| `train(mode=True)` | Sets training mode |
+| `eval()` | Sets evaluation mode |
+| `get_model()` | Returns the underlying PyTorch model |
+| `report()` | Displays model and GPU memory information |
+
+**Capabilities:**
+
+- Keeps master model parameters in system RAM.
+- Transfers layer parameters to GPU for computation.
+- Uses autograd saved-tensor hooks for activation offloading.
+- Supports backward propagation.
+- Supports CPU-based optimizer updates.
+
 ## Limitations
 
 - TFLOPS values are theoretical estimates, not measured benchmark results.
@@ -134,7 +217,11 @@ Creates a tensor memory manager that manages storage between system RAM and GPU 
 - GPU memory statistics depend on PyTorch CUDA availability.
 - RAM is significantly slower than GPU VRAM.
 - RAMVRAM requires explicit tensor retrieval through `memory.get()`.
-- RAMVRAM does not currently provide transparent CUDA memory extension or seamless autograd-compatible model training.
+- RAMVRAMModel currently supports `nn.Sequential` architectures.
+- RAMVRAMModel is experimental and does not guarantee a strict VRAM usage limit.
+- Individual layers must fit into available GPU memory.
+- Optimizer states and gradients can consume substantial system RAM.
+- Performance may decrease significantly due to CPU/GPU transfers.
 
 ## License
 

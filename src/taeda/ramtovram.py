@@ -1,8 +1,15 @@
-
 import torch
+import torch.nn as nn
 import gc
 import threading
 
+from torch.func import functional_call
+from torch.autograd.graph import saved_tensors_hooks
+
+
+# ============================================================
+# RAMVRAM - Tensor memory manager
+# ============================================================
 
 class RAMVRAM:
     def __init__(
@@ -21,6 +28,9 @@ class RAMVRAM:
 
         if self.device.type == "cuda" and not torch.cuda.is_available():
             raise RuntimeError("CUDA is not available")
+
+        if not 0 < max_vram_percent <= 100:
+            raise ValueError("max_vram_percent must be between 0 and 100")
 
     def stats(self):
         if self.device.type != "cuda":
@@ -92,7 +102,9 @@ class RAMVRAM:
 
             tensor = entry["tensor"]
 
-            if self._needs_offload(tensor.numel() * tensor.element_size()):
+            if self._needs_offload(
+                tensor.numel() * tensor.element_size()
+            ):
                 self.offload_oldest(exclude=tensor_id)
 
             entry["tensor"] = tensor.to(
@@ -186,3 +198,132 @@ class RAMVRAM:
 
     def __len__(self):
         return len(self.tensors)
+
+
+# ============================================================
+# RAMVRAMModel - Autograd-aware sequential model offloading
+# ============================================================
+
+class RAMVRAMModel(nn.Module):
+    def __init__(
+        self,
+        model,
+        device="cuda",
+        max_vram_percent=80,
+        pin_memory=True
+    ):
+        super().__init__()
+
+        if not isinstance(model, nn.Sequential):
+            raise TypeError(
+                "RAMVRAMModel currently supports nn.Sequential models."
+            )
+
+        self.device = torch.device(device)
+        self.max_vram_percent = max_vram_percent
+        self.pin_memory = pin_memory
+
+        if not 0 < max_vram_percent <= 100:
+            raise ValueError("max_vram_percent must be between 0 and 100")
+
+        if self.device.type == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("CUDA is not available")
+
+        # Master parameters remain in RAM.
+        self.model = model.cpu()
+
+        self.layers = list(self.model.children())
+
+    def forward(self, x):
+        for layer in self.layers:
+            # FIX: activations are parked on the CPU between layers,
+            # so move them back to the GPU at the start of EVERY layer.
+            x = x.to(self.device)
+
+            params = {
+                name: param.to(self.device)
+                for name, param in layer.named_parameters()
+            }
+
+            buffers = {
+                name: buffer.to(self.device)
+                for name, buffer in layer.named_buffers()
+            }
+
+            with saved_tensors_hooks(self._pack, self._unpack):
+                output = functional_call(
+                    layer,
+                    (params, buffers),
+                    (x,)
+                )
+
+            # Copy updated buffers (e.g. BatchNorm stats) back to the
+            # original layer. Build the lookup once per layer.
+            orig_buffers = dict(layer.named_buffers())
+            for name, buffer in buffers.items():
+                original = orig_buffers[name]
+                original.copy_(buffer.detach().to(original.device))
+
+            # Keep intermediate activations in system RAM
+            x = output.to("cpu")
+
+            del params, buffers, output
+
+        return x.to(self.device)
+
+    def _pack(self, tensor):
+        if tensor.device.type != "cuda":
+            return tensor
+
+        cpu_tensor = tensor.detach().to("cpu")
+
+        if self.pin_memory:
+            cpu_tensor = cpu_tensor.pin_memory()
+
+        return cpu_tensor, tensor.device
+
+    def _unpack(self, packed):
+        if isinstance(packed, torch.Tensor):
+            return packed
+
+        cpu_tensor, original_device = packed
+
+        return cpu_tensor.to(
+            original_device,
+            non_blocking=self.pin_memory
+        )
+
+    def train(self, mode=True):
+        # Sets self.training and recurses into self.model.
+        super().train(mode)
+        return self
+
+    def eval(self):
+        return self.train(False)
+
+    def get_model(self):
+        return self.model
+
+    def report(self):
+        print("=== RAMVRAMModel ===")
+        print("Layers:", len(self.layers))
+        print("Device:", self.device)
+        print("VRAM budget:", self.max_vram_percent, "%")
+
+        params = sum(
+            p.numel() for p in self.model.parameters()
+        )
+
+        size = sum(
+            p.numel() * p.element_size()
+            for p in self.model.parameters()
+        )
+
+        print(f"Parameters: {params:,}")
+        print(f"Master weights in RAM: {size / 1024**2:.2f} MB")
+
+        if self.device.type == "cuda":
+            free, total = torch.cuda.mem_get_info(self.device)
+
+            print(f"VRAM total: {total / 1024**3:.2f} GB")
+            print(f"VRAM free: {free / 1024**3:.2f} GB")
