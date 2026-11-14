@@ -40,17 +40,32 @@ pip install taeda
 ## Usage
 
 ```python
+
 import torch
 import taeda
 
+
+# ============================================================
+# GPU PERFORMANCE
+# ============================================================
+
 # Get theoretical GPU performance
 tflops = taeda.get_tflops(0)
-
 print(f"GPU Performance: {tflops:.3f} TFLOPS")
+
+
+# ============================================================
+# GPU STATISTICS
+# ============================================================
 
 # Get GPU information and statistics
 stats = taeda.get_gpu_stats(0)
 print(stats)
+
+
+# ============================================================
+# RAMVRAM
+# ============================================================
 
 # Initialize RAMVRAM
 memory = taeda.RAMVRAM(max_vram_percent=80)
@@ -62,8 +77,23 @@ b = memory.store(torch.randn(5000, 5000))
 # Retrieve a tensor
 tensor = memory.get(a)
 
-# Display memory information
+# Display RAMVRAM memory information
 memory.report()
+
+# ============================================================
+# VRAM Allocation
+# ============================================================
+
+# Allocate 256 MB of VRAM
+taeda.alloc_vram(256)
+
+# Get allocated VRAM
+allocated = taeda.get_allocated_vram()
+print(f"Allocated VRAM: {allocated:.2f} MB")
+
+# Free allocated VRAM
+taeda.free_vram()
+
 ```
 
 ## RAMVRAMModel Usage
@@ -116,96 +146,6 @@ for epoch in range(10):
 # Display memory information
 model.report()
 ```
-
-## API
-
-### `get_tflops(device_num=0)`
-
-Estimates the theoretical FP32 performance of an NVIDIA GPU.
-
-| Parameter | Description |
-|---|---|
-| `device_num` | CUDA GPU index (default: `0`) |
-
-**Returns:** Estimated FP32 performance in TFLOPS (`float`), or `None` if CUDA is unavailable.
-
-**Raises:** `ValueError` if the GPU index is invalid.
-
-The clock speed is retrieved dynamically through NVML.
-
-### `get_gpu_stats(device_num=0)`
-
-Retrieves GPU information and memory statistics using PyTorch CUDA.
-
-| Parameter | Description |
-|---|---|
-| `device_num` | CUDA GPU index (default: `0`) |
-
-**Returns:** A formatted string containing:
-
-- CUDA availability
-- GPU device name
-- GPU device index
-- CUDA version
-- Total VRAM
-- Used VRAM
-- Free VRAM
-
-**Raises:** Returns an error message if CUDA is unavailable or the GPU index is invalid.
-
-### `RAMVRAM(device="cuda", max_vram_percent=85, pin_memory=True)`
-
-Creates a tensor memory manager that manages storage between system RAM and GPU VRAM.
-
-| Parameter | Description |
-|---|---|
-| `device` | Target device (default: `"cuda"`) |
-| `max_vram_percent` | Maximum target VRAM usage percentage (default: `85`) |
-| `pin_memory` | Enable pinned CPU memory (default: `True`) |
-
-**Methods:**
-
-| Method | Description |
-|---|---|
-| `store(tensor)` | Stores a tensor and returns its ID |
-| `get(tensor_id)` | Retrieves a tensor, restoring it to GPU if needed |
-| `offload(tensor_id)` | Moves a tensor to system RAM |
-| `restore(tensor_id)` | Restores a tensor to GPU |
-| `offload_oldest()` | Offloads stored GPU tensors |
-| `stats()` | Retrieves VRAM statistics |
-| `usage()` | Returns GPU memory usage percentage |
-| `report()` | Displays memory usage information |
-| `remove(tensor_id)` | Removes a stored tensor |
-| `clear()` | Clears stored tensors |
-
-### `RAMVRAMModel(model, device="cuda", max_vram_percent=80, pin_memory=True)`
-
-Creates an experimental model wrapper for managing model weights and activations between system RAM and GPU VRAM.
-
-| Parameter | Description |
-|---|---|
-| `model` | PyTorch `nn.Sequential` model |
-| `device` | Target computation device (default: `"cuda"`) |
-| `max_vram_percent` | Configured VRAM budget percentage (default: `80`) |
-| `pin_memory` | Enable pinned CPU memory (default: `True`) |
-
-**Methods:**
-
-| Method | Description |
-|---|---|
-| `forward(x)` | Performs layer-by-layer model execution |
-| `train(mode=True)` | Sets training mode |
-| `eval()` | Sets evaluation mode |
-| `get_model()` | Returns the underlying PyTorch model |
-| `report()` | Displays model and GPU memory information |
-
-**Capabilities:**
-
-- Keeps master model parameters in system RAM.
-- Transfers layer parameters to GPU for computation.
-- Uses autograd saved-tensor hooks for activation offloading.
-- Supports backward propagation.
-- Supports CPU-based optimizer updates.
 
 ## Limitations
 
