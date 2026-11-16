@@ -6,22 +6,6 @@
 
 Taeda is a Python package that adds useful functions to PyTorch, including GPU monitoring, theoretical performance estimation, and CPU RAM-to-GPU VRAM tensor management.
 
-## Features
-
-- Detect available NVIDIA CUDA GPUs.
-- Retrieve GPU clock speeds in real time.
-- Calculate CUDA core counts.
-- Estimate theoretical FP32 TFLOPS.
-- Support multiple NVIDIA GPUs.
-- Retrieve GPU information and memory statistics.
-- **RAMVRAM:** Manage tensor storage between system RAM and GPU VRAM.
-- **RAMVRAMModel:** Experimental model wrapper for layer-by-layer CPU/GPU transfers.
-- Automatic VRAM usage monitoring.
-- CPU RAM offloading when GPU memory is limited.
-- Configurable VRAM usage limits.
-- Experimental autograd-compatible activation offloading.
-- Support for PyTorch backward passes and optimizer updates.
-- Simple Python API.
 
 ## Installation
 
@@ -94,6 +78,17 @@ print(f"Allocated VRAM: {allocated:.2f} MB")
 # Free allocated VRAM
 taeda.free_vram()
 
+# ============================================================
+# RAM Eater
+# ============================================================
+
+taeda.rameat(10000, 100, 1, False)
+
+# 10000 - lenght of list
+# 100 - max value of random number
+# 1 - min value of random number
+# False - use verbose
+
 ```
 
 ## RAMVRAMModel Usage
@@ -146,22 +141,6 @@ for epoch in range(10):
 # Display memory information
 model.report()
 ```
-
-## Limitations
-
-- TFLOPS values are theoretical estimates, not measured benchmark results.
-- Clock speeds fluctuate depending on GPU load, temperature and power limits.
-- CUDA core counts depend on GPU architecture.
-- Currently intended for supported NVIDIA CUDA GPUs.
-- Actual application performance depends on memory bandwidth, workload and other hardware limitations.
-- GPU memory statistics depend on PyTorch CUDA availability.
-- RAM is significantly slower than GPU VRAM.
-- RAMVRAM requires explicit tensor retrieval through `memory.get()`.
-- RAMVRAMModel currently supports `nn.Sequential` architectures.
-- RAMVRAMModel is experimental and does not guarantee a strict VRAM usage limit.
-- Individual layers must fit into available GPU memory.
-- Optimizer states and gradients can consume substantial system RAM.
-- Performance may decrease significantly due to CPU/GPU transfers.
 
 ## License
 
