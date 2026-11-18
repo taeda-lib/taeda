@@ -89,6 +89,18 @@ taeda.rameat(10000, 100, 1, False)
 # 1 - min value of random number
 # False - use verbose
 
+# ============================================================
+# Fake Nvidia SMI
+# ============================================================
+
+taeda.fake_nsmi()                                                  # defaults
+taeda.fake_nsmi("572.83", "NVIDIA GeForce RTX 3060", 12288)        # driver, GPU name, total memory (MiB)
+taeda.fake_nsmi("572.83", "NVIDIA GeForce RTX 3060", 12288, 3500)  # + fixed used memory
+
+# Use :
+#    python -c "import fake_nvidiasmi; print(fake_nvidiasmi.fake_nsmi('572.83', 'RTX PRO 6000 Blackwell', 97887, 3549))"
+# For a better effect
+
 ```
 
 ## RAMVRAMModel Usage
