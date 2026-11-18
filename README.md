@@ -98,7 +98,7 @@ taeda.fake_nsmi("572.83", "NVIDIA GeForce RTX 3060", 12288)        # driver, GPU
 taeda.fake_nsmi("572.83", "NVIDIA GeForce RTX 3060", 12288, 3500)  # + fixed used memory
 
 # Use :
-#    python -c "import fake_nvidiasmi; print(fake_nvidiasmi.fake_nsmi('572.83', 'RTX PRO 6000 Blackwell', 97887, 3549))"
+#    python -c "import taeda; print(taeda.fake_nsmi('572.83', 'RTX PRO 6000 Blackwell', 97887, 3549))"
 # For a better effect
 
 ```
